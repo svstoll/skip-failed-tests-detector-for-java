@@ -1,0 +1,211 @@
+package ch.svenstoll.mbm.skipfailedtestdetectorforjava.extractor;
+
+import ch.svenstoll.mbm.skipfailedtestdetectorforjava.model.BasicClassData;
+import ch.svenstoll.mbm.skipfailedtestdetectorforjava.model.BasicMethodData;
+import ch.svenstoll.mbm.skipfailedtestdetectorforjava.model.Build;
+import ch.svenstoll.mbm.skipfailedtestdetectorforjava.utility.CollectionUtility;
+import com.github.javaparser.JavaParser;
+import com.github.javaparser.ParseProblemException;
+import com.github.javaparser.TokenMgrException;
+import com.github.javaparser.ast.CompilationUnit;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+public class MethodExtractor {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(MethodExtractor.class);
+
+  private final String outputFolderPath;
+
+  public MethodExtractor(String outputFolderPath) {
+    this.outputFolderPath = outputFolderPath;
+  }
+
+  /**
+   * All methods contained in Java files where the word {@code test} (case ignored) occurs in the
+   * file path will be extracted.
+   *
+   * @param build
+   *     The build for which methods will be extracted.
+   */
+  public void extractMethodsForBuild(Build build) {
+    if (build == null || build.getExtractionSuccessful() != null) {
+      return;
+    }
+
+    String projectName = build.getProjectBranchKey().getProjectName();
+    Git git;
+    try {
+      git = cloneProjectRepository(projectName);
+    }
+    catch (GitAPIException | IOException e) {
+      LOGGER.error("Failed to find or clone GitHub repository for {}.", projectName, e);
+      build.setExtractionSuccessful(false);
+      return;
+    }
+
+    extractMethodsForBuildInternal(git, build);
+  }
+
+  private Git cloneProjectRepository(String projectName) throws GitAPIException, IOException {
+    String projectPath = getProjectPath(projectName);
+    if (!Files.exists(Paths.get(projectPath))) {
+      LOGGER.info("Cloning repository for {}.", projectName);
+      return Git.cloneRepository()
+          .setURI(getGitURI(projectName))
+          .setDirectory(new File(projectPath))
+          .call();
+    }
+    else {
+      return Git.open(new File(projectPath));
+    }
+  }
+
+  private String getProjectPath(String projectName) {
+    String projectPath = projectName.replace("/", "#");
+    return outputFolderPath + "/Repositories/" + projectPath;
+  }
+
+  private String getGitURI(String projectName) {
+    return "https://github.com/" + projectName + ".git";
+  }
+
+  private void extractMethodsForBuildInternal(Git git, Build build) {
+    try {
+      LOGGER.info("Extracting methods for {}.", build);
+      Set<String> cleanedFiles = git.clean().setForce(true).call();
+      if (!CollectionUtility.isNullOrEmpty(cleanedFiles)) {
+        LOGGER.warn("Removed some untracked files: {}", cleanedFiles);
+      }
+
+      git.checkout().setName(build.getTriggerCommit()).call();
+
+      int availableProcessors = Runtime.getRuntime().availableProcessors();
+      final ExecutorService executorService = Executors.newFixedThreadPool(availableProcessors);
+      final Map<BasicClassData, List<BasicMethodData>> methodsByClass = new ConcurrentHashMap<>();
+
+      Files.walk(Paths.get(git.getRepository().getWorkTree().toString()))
+          .filter(path -> path.toString().toLowerCase().contains("test"))
+          .filter(path -> path.getFileName().toString().toLowerCase().endsWith(".java"))
+          .forEach(path -> executorService.execute(() -> extractMethodsFromFile(path, methodsByClass)));
+      executorService.shutdown();
+      executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+
+      checkForExtendedTestMethods(methodsByClass);
+      build.setMethodsByClass(methodsByClass);
+      build.setExtractionSuccessful(true);
+    }
+    catch (Exception e) {
+      LOGGER.error("Error during method extraction for {}.", build, e);
+      build.setExtractionSuccessful(false);
+    }
+  }
+
+  private void extractMethodsFromFile(Path path, final Map<BasicClassData, List<BasicMethodData>> methodsByClass) {
+    try (FileInputStream inputStream = new FileInputStream(path.toFile())){
+      CompilationUnit compilationUnit = JavaParser.parse(inputStream);
+      String packageName = "";
+      if (compilationUnit.getPackageDeclaration().isPresent()) {
+        packageName = compilationUnit.getPackageDeclaration().get().getNameAsString();
+      }
+
+      compilationUnit.accept(new MethodVisitor(), new MethodVisitorArgument(packageName, methodsByClass));
+    }
+    catch (TokenMgrException | ParseProblemException e) {
+      // Because there are cases where projects keep invalid Java files for testing purposes (e.g.
+      // SonarQube, Checkstyle or Qulice), these exceptions are simply caught and logged, but will
+      // not result in a failed build analysis.
+      LOGGER.warn("Could not parse \"{}\".", path.toString());
+    }
+    catch (IOException e) {
+      throw new RuntimeException("I/O exception while trying to extract methods for \"" + path.toString() + "\".", e);
+    }
+  }
+
+  private void checkForExtendedTestMethods(Map<BasicClassData, List<BasicMethodData>> methodsByClass) {
+    Map<String, List<BasicClassData>> classesBySimpleClassName = generateClassesBySimpleClassNameMap(methodsByClass);
+    for (List<BasicMethodData> methods : methodsByClass.values()) {
+      for (BasicMethodData method : methods) {
+        if (!method.isTestMethod() && !method.isAbstractMethod() && method.isChildMethod()) {
+          findExtendedTestMethods(method, classesBySimpleClassName, methodsByClass);
+        }
+      }
+    }
+  }
+
+  private void findExtendedTestMethods(BasicMethodData method,
+                                       Map<String, List<BasicClassData>> classesBySimpleClassName,
+                                       Map<BasicClassData, List<BasicMethodData>> methodsByClass) {
+    List<BasicMethodData> methodChain = new ArrayList<>();
+    methodChain.add(method);
+
+    String simpleParentClassName = method.getBasicClassData().getParentClass();
+    List<BasicClassData> potentialParentClasses = classesBySimpleClassName.get(simpleParentClassName);
+    while (potentialParentClasses != null && potentialParentClasses.size() > 0) {
+      List<BasicClassData> newPotentialParentClasses = null;
+      parentClassLoop: for (BasicClassData potentialParentClass : potentialParentClasses) {
+        List<BasicMethodData> potentialParentClassMethods = methodsByClass.get(potentialParentClass);
+        for (BasicMethodData potentialParentClassMethod : potentialParentClassMethods) {
+          if (method.getSignature().equals(potentialParentClassMethod.getSignature())) {
+            methodChain.add(potentialParentClassMethod);
+            newPotentialParentClasses = classesBySimpleClassName.get(potentialParentClass.getParentClass());
+            break parentClassLoop;
+          }
+        }
+      }
+
+      if (newPotentialParentClasses != null && newPotentialParentClasses.equals(potentialParentClasses)) {
+        LOGGER.warn("Loop detected while searching for potential parent classes for: {}", newPotentialParentClasses);
+        potentialParentClasses = null;
+      }
+      else {
+        potentialParentClasses = newPotentialParentClasses;
+      }
+    }
+
+    boolean testMethodEncountered = false;
+    for (int i = methodChain.size() - 1; i >= 0; i--) {
+      if (methodChain.get(i).isTestMethod()) {
+        testMethodEncountered = true;
+      }
+      else if (testMethodEncountered) {
+        methodChain.get(i).setIsTestMethod(true);
+      }
+    }
+  }
+
+  private Map<String, List<BasicClassData>> generateClassesBySimpleClassNameMap(Map<BasicClassData, List<BasicMethodData>> methodsByClass) {
+    Map<String, List<BasicClassData>> classesBySimpleClassName = new HashMap<>();
+
+    for (BasicClassData classData : methodsByClass.keySet()) {
+      if (classData.getSimpleName() == null) {
+        continue;
+      }
+      List<BasicClassData> classes = classesBySimpleClassName.get(classData.getSimpleName());
+      if (classes == null) {
+        classes = new ArrayList<>();
+        classes.add(classData);
+        classesBySimpleClassName.put(classData.getSimpleName(), classes);
+      }
+      else {
+        classes.add(classData);
+      }
+    }
+
+    return classesBySimpleClassName;
+  }
+}

@@ -3,12 +3,13 @@ package ch.svenstoll.mbm.skipfailedtestdetectorforjava.extractor;
 import ch.svenstoll.mbm.skipfailedtestdetectorforjava.model.BasicClassData;
 import ch.svenstoll.mbm.skipfailedtestdetectorforjava.model.BasicMethodData;
 import ch.svenstoll.mbm.skipfailedtestdetectorforjava.model.Build;
-import ch.svenstoll.mbm.skipfailedtestdetectorforjava.utility.CollectionUtility;
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParseProblemException;
 import com.github.javaparser.TokenMgrException;
 import com.github.javaparser.ast.CompilationUnit;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.ResetCommand;
+import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,11 +20,16 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+
+import static ch.svenstoll.mbm.skipfailedtestdetectorforjava.utility.BooleanUtility.nvl;
 
 public class MethodExtractor {
 
@@ -87,9 +93,14 @@ public class MethodExtractor {
   private void extractMethodsForBuildInternal(Git git, Build build) {
     try {
       LOGGER.info("Extracting methods for {}.", build);
-      Set<String> cleanedFiles = git.clean().setForce(true).call();
-      if (!CollectionUtility.isNullOrEmpty(cleanedFiles)) {
-        LOGGER.warn("Removed some untracked files: {}", cleanedFiles);
+      // There are cases where files are left behind after a checkout. The working directory must be
+      // in a clean state so that checkout will not fail.
+      Status status = git.status().call();
+      if (status.hasUncommittedChanges() || !status.isClean()) {
+        git.gc();
+        git.clean().setForce(true).call();
+        git.reset().setMode(ResetCommand.ResetType.HARD).call();
+        git.stashCreate().setIncludeUntracked(true).call();
       }
 
       git.checkout().setName(build.getTriggerCommit()).call();
@@ -137,24 +148,24 @@ public class MethodExtractor {
   }
 
   private void checkForExtendedTestMethods(Map<BasicClassData, List<BasicMethodData>> methodsByClass) {
-    Map<String, List<BasicClassData>> classesBySimpleClassName = generateClassesBySimpleClassNameMap(methodsByClass);
+    Map<String, List<BasicClassData>> classDataBySimpleClassName = generateClassDataBySimpleClassNameMap(methodsByClass);
     for (List<BasicMethodData> methods : methodsByClass.values()) {
       for (BasicMethodData method : methods) {
-        if (!method.isTestMethod() && !method.isAbstractMethod() && method.isChildMethod()) {
-          findExtendedTestMethods(method, classesBySimpleClassName, methodsByClass);
+        if (!nvl(method.isTestMethod()) && !nvl(method.isAbstractMethod()) && nvl(method.isChildMethod())) {
+          findExtendedTestMethods(method, classDataBySimpleClassName, methodsByClass);
         }
       }
     }
   }
 
   private void findExtendedTestMethods(BasicMethodData method,
-                                       Map<String, List<BasicClassData>> classesBySimpleClassName,
+                                       Map<String, List<BasicClassData>> classDataBySimpleClassName,
                                        Map<BasicClassData, List<BasicMethodData>> methodsByClass) {
     List<BasicMethodData> methodChain = new ArrayList<>();
     methodChain.add(method);
 
     String simpleParentClassName = method.getBasicClassData().getParentClass();
-    List<BasicClassData> potentialParentClasses = classesBySimpleClassName.get(simpleParentClassName);
+    List<BasicClassData> potentialParentClasses = classDataBySimpleClassName.get(simpleParentClassName);
     while (potentialParentClasses != null && potentialParentClasses.size() > 0) {
       List<BasicClassData> newPotentialParentClasses = null;
       parentClassLoop: for (BasicClassData potentialParentClass : potentialParentClasses) {
@@ -162,14 +173,14 @@ public class MethodExtractor {
         for (BasicMethodData potentialParentClassMethod : potentialParentClassMethods) {
           if (method.getSignature().equals(potentialParentClassMethod.getSignature())) {
             methodChain.add(potentialParentClassMethod);
-            newPotentialParentClasses = classesBySimpleClassName.get(potentialParentClass.getParentClass());
+            newPotentialParentClasses = classDataBySimpleClassName.get(potentialParentClass.getParentClass());
             break parentClassLoop;
           }
         }
       }
 
       if (newPotentialParentClasses != null && newPotentialParentClasses.equals(potentialParentClasses)) {
-        LOGGER.warn("Loop detected while searching for potential parent classes for: {}", newPotentialParentClasses);
+        LOGGER.debug("Loop detected while searching for potential parent classes for: {}", newPotentialParentClasses);
         potentialParentClasses = null;
       }
       else {
@@ -188,24 +199,24 @@ public class MethodExtractor {
     }
   }
 
-  private Map<String, List<BasicClassData>> generateClassesBySimpleClassNameMap(Map<BasicClassData, List<BasicMethodData>> methodsByClass) {
-    Map<String, List<BasicClassData>> classesBySimpleClassName = new HashMap<>();
+  private Map<String, List<BasicClassData>> generateClassDataBySimpleClassNameMap(Map<BasicClassData, List<BasicMethodData>> methodsByClass) {
+    Map<String, List<BasicClassData>> classDataBySimpleClassName = new HashMap<>();
 
     for (BasicClassData classData : methodsByClass.keySet()) {
       if (classData.getSimpleName() == null) {
         continue;
       }
-      List<BasicClassData> classes = classesBySimpleClassName.get(classData.getSimpleName());
+      List<BasicClassData> classes = classDataBySimpleClassName.get(classData.getSimpleName());
       if (classes == null) {
         classes = new ArrayList<>();
         classes.add(classData);
-        classesBySimpleClassName.put(classData.getSimpleName(), classes);
+        classDataBySimpleClassName.put(classData.getSimpleName(), classes);
       }
       else {
         classes.add(classData);
       }
     }
 
-    return classesBySimpleClassName;
+    return classDataBySimpleClassName;
   }
 }

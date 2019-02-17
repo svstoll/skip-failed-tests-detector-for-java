@@ -33,7 +33,6 @@ public class BuildComparator {
     if (StringUtility.isNullOrEmpty(outputFolderPath)) {
       throw new IllegalArgumentException("The outputFolderPath must not be null or empty.");
     }
-
     this.outputFolderPath = outputFolderPath;
   }
 

@@ -74,7 +74,6 @@ public class SkipFailedTestsDetector {
 
   private static Logger logger;
 
-
   /**
    * The entry point to the program.
    *

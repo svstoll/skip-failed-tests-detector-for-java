@@ -2,6 +2,7 @@ package ch.svenstoll.mbm.skipfailedtestdetectorforjava.parser;
 
 import ch.svenstoll.mbm.skipfailedtestdetectorforjava.model.Build;
 import ch.svenstoll.mbm.skipfailedtestdetectorforjava.model.ProjectBranchKey;
+import ch.svenstoll.mbm.skipfailedtestdetectorforjava.utility.CollectionUtility;
 import ch.svenstoll.mbm.skipfailedtestdetectorforjava.utility.NumberUtility;
 import ch.svenstoll.mbm.skipfailedtestdetectorforjava.utility.StringUtility;
 import org.apache.commons.csv.CSVFormat;
@@ -14,6 +15,7 @@ import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class BuildParser {
 
@@ -23,7 +25,6 @@ public class BuildParser {
       "git_branch",
       "tr_build_id",
       "tr_prev_build",
-      "tr_job_id",
       "git_trigger_commit",
       "tr_status",
       "tr_log_num_tests_run",
@@ -34,6 +35,8 @@ public class BuildParser {
 
   public List<Build> parseBuildsFile(String buildsFilePath) {
     List<Build> builds = new ArrayList<>();
+    Set<String> involvedProjects = new HashSet<>();
+    Set<String> projectsWithExtractionErrors = new HashSet<>();
     try (Reader reader = Files.newBufferedReader(Paths.get(buildsFilePath))) {
       CSVFormat csvFormat = CSVFormat.DEFAULT
           .withHeader(HEADERS)
@@ -43,20 +46,37 @@ public class BuildParser {
       CSVParser csvParser = new CSVParser(reader, csvFormat);
 
       for (CSVRecord record : csvParser.getRecords()) {
-        builds.add(transformRecordToBuild(record));
+        Build build = transformRecordToBuild(record);
+        builds.add(build);
+
+        String project = build.getProjectBranchKey().getProjectName();
+        involvedProjects.add(project);
+        if (hasExtractionErrors(build)) {
+          projectsWithExtractionErrors.add(project);
+        }
       }
     } catch (Exception e) {
       LOGGER.error("Failed to parse the input file.", e);
     }
 
-    return builds;
+    List<Build> validBuilds = builds.stream()
+        .filter(build -> !projectsWithExtractionErrors.contains(build.getProjectBranchKey().getProjectName()))
+        .collect(Collectors.toList());
+    if (projectsWithExtractionErrors.size() >= 1) {
+      int numRemovedBuilds = builds.size() - validBuilds.size();
+      LOGGER.warn("{} projects contain invalid failed methods. All builds ({}) from these " +
+          "projects will be excluded.", projectsWithExtractionErrors.size(), numRemovedBuilds);
+    }
+
+    LOGGER.info("Parsed {} builds from {} projects.", validBuilds.size(),
+        involvedProjects.size() - projectsWithExtractionErrors.size());
+    return validBuilds;
   }
 
   public Build transformRecordToBuild(CSVRecord csvRecord) {
     String project = csvRecord.get("gh_project_name");
     String branch = csvRecord.get("git_branch");
     String buildId = csvRecord.get("tr_build_id");
-    String jobId = csvRecord.get("tr_job_id");
     String prevBuildId = csvRecord.get("tr_prev_build");
     String triggerCommit = csvRecord.get("git_trigger_commit");
     String status = csvRecord.get("tr_status");
@@ -69,7 +89,6 @@ public class BuildParser {
     return Build.BuildBuilder.aBuild()
         .withProjectBranch(new ProjectBranchKey(project, branch))
         .withBuildId(Long.parseLong(buildId))
-        .withJobId(Long.parseLong(jobId))
         .withPrevBuildId(NumberUtility.parseLongSafely(prevBuildId))
         .withTriggerCommit(triggerCommit)
         .andStatus(status)
@@ -79,5 +98,20 @@ public class BuildParser {
         .andNumTestsSkipped(NumberUtility.parseIntegerSafely(numTestsSkipped))
         .andFailedMethods((StringUtility.fromConcatenatedStringsToList(failedMethods, "#")))
         .create();
+  }
+
+  private boolean hasExtractionErrors(Build build) {
+    if (CollectionUtility.isNullOrEmpty(build.getFailedMethods())) {
+      return false;
+    }
+
+    boolean hasExtractionErrors = false;
+    for (String method : build.getFailedMethods()) {
+      if (method.isEmpty() || !Character.isLowerCase(method.charAt(0)) || method.contains(" ")) {
+        System.out.println(method);
+        hasExtractionErrors = true;
+      }
+    }
+    return hasExtractionErrors;
   }
 }

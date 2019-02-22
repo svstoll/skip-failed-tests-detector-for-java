@@ -13,8 +13,6 @@ public final class BuildAnalysisResult {
       "branch_t2",
       "build_id_t1",
       "build_id_t2",
-      "job_id_t1",
-      "job_id_t2",
       "trigger_commit_t1",
       "trigger_commit_t2",
       "num_test_methods_extracted_t1",
@@ -39,8 +37,6 @@ public final class BuildAnalysisResult {
   private final String branchT2;
   private final Long buildIdT1;
   private final long buildIdT2;
-  private final Long jobIdT1;
-  private final long jobIdT2;
   private final String triggerCommitT1;
   private final String triggerCommitT2;
   private final Integer numTestMethodsExtractedT1;
@@ -65,8 +61,6 @@ public final class BuildAnalysisResult {
                              String branchT2,
                              Long buildIdT1,
                              long buildIdT2,
-                             Long jobIdT1,
-                             long jobIdT2,
                              String triggerCommitT1,
                              String triggerCommitT2,
                              Integer numTestMethodsExtractedT1,
@@ -94,8 +88,6 @@ public final class BuildAnalysisResult {
     this.branchT2 = branchT2;
     this.buildIdT1 = buildIdT1;
     this.buildIdT2 = buildIdT2;
-    this.jobIdT1 = jobIdT1;
-    this.jobIdT2 = jobIdT2;
     this.triggerCommitT1 = triggerCommitT1;
     this.triggerCommitT2 = triggerCommitT2;
     this.numTestMethodsExtractedT1 = numTestMethodsExtractedT1;
@@ -123,8 +115,6 @@ public final class BuildAnalysisResult {
         getBranchT2(),
         getBuildIdT1(),
         getBuildIdT2(),
-        getJobIdT1(),
-        getJobIdT2(),
         getTriggerCommitT1(),
         getTriggerCommitT2(),
         getNumTestMethodsExtractedT1(),
@@ -163,14 +153,6 @@ public final class BuildAnalysisResult {
 
   public Long getBuildIdT2() {
     return buildIdT2;
-  }
-
-  public Long getJobIdT1() {
-    return jobIdT1;
-  }
-
-  public Long getJobIdT2() {
-    return jobIdT2;
   }
 
   public String getTriggerCommitT1() {
@@ -246,8 +228,8 @@ public final class BuildAnalysisResult {
   }
 
   public static final class BuildAnalysisBuilder implements AnalysisOkBuildAnalysisBuilder,
-      ProjectBuildAnalysisBuilder, BranchBuildAnalysisBuilder, BuildIdT1BuildAnalysisBuilder,
-      BuildNumberT1BuildAnalysisBuilder, TriggerCommitT1BuildAnalysisBuilder, FinalBuildAnalysisBuilder {
+      ProjectBuildAnalysisBuilder, BranchBuildAnalysisBuilder, BuildIdT2BuildAnalysisBuilder,
+      TriggerCommitT2BuildAnalysisBuilder, FinalBuildAnalysisBuilder {
 
     private String project;
     private String branchT1;
@@ -295,20 +277,14 @@ public final class BuildAnalysisResult {
     }
 
     @Override
-    public BuildIdT1BuildAnalysisBuilder withBranchT2(String branchT2) {
+    public BuildIdT2BuildAnalysisBuilder withBranchT2(String branchT2) {
       this.branchT2 = branchT2;
       return this;
     }
 
     @Override
-    public BuildNumberT1BuildAnalysisBuilder withBuildIdT2(long buildIdT2) {
+    public TriggerCommitT2BuildAnalysisBuilder withBuildIdT2(long buildIdT2) {
       this.buildIdT2 = buildIdT2;
-      return this;
-    }
-
-    @Override
-    public TriggerCommitT1BuildAnalysisBuilder withJobIdT2(long jobIdT2) {
-      this.jobIdT2 = jobIdT2;
       return this;
     }
 
@@ -440,8 +416,6 @@ public final class BuildAnalysisResult {
           branchT2,
           buildIdT1,
           buildIdT2,
-          jobIdT1,
-          jobIdT2,
           triggerCommitT1,
           triggerCommitT2,
           numTestMethodsExtractedT1,
@@ -472,18 +446,14 @@ public final class BuildAnalysisResult {
   }
 
   public interface BranchBuildAnalysisBuilder {
-    BuildIdT1BuildAnalysisBuilder withBranchT2(String branchT2);
+    BuildIdT2BuildAnalysisBuilder withBranchT2(String branchT2);
   }
 
-  public interface BuildIdT1BuildAnalysisBuilder {
-    BuildNumberT1BuildAnalysisBuilder withBuildIdT2(long buildIdT2);
+  public interface BuildIdT2BuildAnalysisBuilder {
+    TriggerCommitT2BuildAnalysisBuilder withBuildIdT2(long buildIdT2);
   }
 
-  public interface BuildNumberT1BuildAnalysisBuilder {
-    TriggerCommitT1BuildAnalysisBuilder withJobIdT2(long jobIdT2);
-  }
-
-  public interface TriggerCommitT1BuildAnalysisBuilder {
+  public interface TriggerCommitT2BuildAnalysisBuilder {
     FinalBuildAnalysisBuilder withTriggerCommitT2(String triggerCommitT2);
   }
 

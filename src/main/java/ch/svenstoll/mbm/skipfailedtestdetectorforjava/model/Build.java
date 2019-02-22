@@ -8,7 +8,6 @@ public class Build {
 
   private final ProjectBranchKey projectBranchKey;
   private final long buildId;
-  private final long jobId;
   private final Long prevBuildId;
   private final String triggerCommit;
   private final String status;
@@ -23,7 +22,6 @@ public class Build {
   private Build(
       ProjectBranchKey projectBranchKey,
       long buildId,
-      long jobId,
       Long prevBuildId,
       String triggerCommit,
       String status,
@@ -43,7 +41,6 @@ public class Build {
 
     this.projectBranchKey = projectBranchKey;
     this.buildId = buildId;
-    this.jobId = jobId;
     this.prevBuildId = prevBuildId;
     this.triggerCommit = triggerCommit;
     this.status = status;
@@ -72,7 +69,6 @@ public class Build {
 
     this.projectBranchKey = new ProjectBranchKey(project, branch);
     this.buildId = build.buildId;
-    this.jobId = build.jobId;
     this.prevBuildId = build.prevBuildId;
     this.triggerCommit = build.triggerCommit;
     this.status = build.status;
@@ -117,10 +113,6 @@ public class Build {
 
   public long getBuildId() {
     return buildId;
-  }
-
-  public long getJobId() {
-    return jobId;
   }
 
   public Long getPrevBuildId() {
@@ -177,7 +169,7 @@ public class Build {
   }
 
   public static class BuildBuilder implements ProjectBranchBuildBuilder, BuildIdBuildBuilder,
-      JobIdBuildBuilder, PrevBuildIdBuildBuilder, TriggerCommitBuildBuilder, FinalBuildBuilder {
+      PrevBuildIdBuildBuilder, TriggerCommitBuildBuilder, FinalBuildBuilder {
 
     private ProjectBranchKey projectBranchKey;
     private long buildId;
@@ -207,14 +199,8 @@ public class Build {
     }
 
     @Override
-    public JobIdBuildBuilder withBuildId(long buildId) {
+    public PrevBuildIdBuildBuilder withBuildId(long buildId) {
       this.buildId = buildId;
-      return this;
-    }
-
-    @Override
-    public PrevBuildIdBuildBuilder withJobId(long jobId) {
-      this.jobId = jobId;
       return this;
     }
 
@@ -283,7 +269,6 @@ public class Build {
       return new Build(
           projectBranchKey,
           buildId,
-          jobId,
           prevBuildId,
           triggerCommit,
           status,
@@ -302,11 +287,7 @@ public class Build {
   }
 
   public interface BuildIdBuildBuilder {
-    JobIdBuildBuilder withBuildId(long buildId);
-  }
-
-  public interface JobIdBuildBuilder {
-    PrevBuildIdBuildBuilder withJobId(long buildNumber);
+    PrevBuildIdBuildBuilder withBuildId(long buildId);
   }
 
   public interface PrevBuildIdBuildBuilder {

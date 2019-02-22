@@ -66,8 +66,12 @@ public class BuildComparator {
         Build buildT1Copy = buildT1 != null ? new Build(buildT1) : null;
         Build buildT2Copy = new Build(buildT2);
 
-        extractor.extractMethodsForBuild(buildT1Copy);
-        extractor.extractMethodsForBuild(buildT2Copy);
+
+        if (buildT1 != null && !CollectionUtility.isNullOrEmpty(buildT1.getFailedMethods())) {
+          extractor.extractMethodsForBuild(buildT1Copy);
+          extractor.extractMethodsForBuild(buildT2Copy);
+        }
+
         compareConsecutiveBuilds(buildT1Copy, buildT2Copy, allResultsPrinter, smellResultsPrinter);
         lastAnalyzedBuild = buildT2Copy;
 
@@ -105,14 +109,7 @@ public class BuildComparator {
 
       long buildId1 = build1.getBuildId();
       long buildId2 = build2.getBuildId();
-      int buildIdComparison = Long.compare(buildId1, buildId2);
-      if (buildIdComparison != 0) {
-        return buildIdComparison;
-      }
-
-      long jobId1 = build1.getJobId();
-      long jobId2 = build2.getJobId();
-      return Long.compare(jobId1, jobId2);
+      return Long.compare(buildId1, buildId2);
     });
 
     // If there are multiple jobs per build, only the first one will be included in the analysis.
@@ -153,7 +150,6 @@ public class BuildComparator {
           .withProject(project)
           .withBranchT2(branch)
           .withBuildIdT2(buildT2.getBuildId())
-          .withJobIdT2(buildT2.getJobId())
           .withTriggerCommitT2(buildT2.getTriggerCommit())
           .create()
           .printToCsv(allResultsPrinter);
@@ -199,11 +195,9 @@ public class BuildComparator {
         .withProject(buildT2.getProjectBranchKey().getProjectName())
         .withBranchT2(buildT2.getProjectBranchKey().getBranch())
         .withBuildIdT2(buildT2.getBuildId())
-        .withJobIdT2(buildT2.getJobId())
         .withTriggerCommitT2(buildT2.getTriggerCommit())
         .andBranchT1(buildT1.getProjectBranchKey().getBranch())
         .andBuildIdT1(buildT1.getBuildId())
-        .andJobIdT1(buildT1.getJobId())
         .andTriggerCommitT1(buildT1.getTriggerCommit())
         .andNumTestMethodsExtractedT1(testMethodsT1.size())
         .andNumTestMethodsExtractedT2(testMethodsT2.size())

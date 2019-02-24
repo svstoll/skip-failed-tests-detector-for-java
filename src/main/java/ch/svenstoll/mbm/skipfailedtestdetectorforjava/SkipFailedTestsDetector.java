@@ -38,16 +38,15 @@ import java.util.List;
  * It is recommended to use data from
  * <a href="https://travistorrent.testroots.org">TravisTorrent</a> as input for this program.
  * Running this program requires you to provide a comma-separated CSV file with the following
- * header: {@code gh_project_name,git_branch,tr_build_id,tr_prev_build,tr_job_id,tr_job_id,
- * git_trigger_commit,tr_status,tr_log_num_tests_run,tr_log_num_tests_ok,tr_log_num_tests_skipped,
- * tr_log_num_tests_failed,tr_log_tests_failed}</p>
+ * header: {@code gh_project_name,git_branch,tr_build_id,tr_prev_build,git_trigger_commit,tr_status,
+ * tr_log_num_tests_run,tr_log_num_tests_ok,tr_log_num_tests_skipped,tr_log_num_tests_failed,
+ * tr_log_tests_failed}</p>
  *
  * <p>The variables in the header are explained
  * <a href="https://travistorrent.testroots.org/page_dataformat">here</a> The values for
- * {@code gh_project}, {@code git_branch}, {@code tr_build_id}, {@code tr_job_id},
- * and {@code git_trigger_commit} must not be empty. Additionally,
- * {@code tr_build_id}, {@code tr_prev_build} and {@code tr_job_id} are required to be valid
- * numbers.</p>
+ * {@code gh_project}, {@code git_branch}, {@code tr_build_id} and {@code git_trigger_commit} must
+ * not be empty. Additionally, {@code tr_build_id} and {@code tr_prev_build} are required to be
+ * valid numbers.</p>
  *
  * <p><strong>Output Data</strong><br>
  * The results of the analysis are two CSV files:
@@ -102,13 +101,13 @@ public class SkipFailedTestsDetector {
       System.out.println("[2] Path to the desired output folder");
       System.out.println();
       System.out.println("The CSV input file must be comma-separated and must contain the following headers:");
-      System.out.println("gh_project_name,git_branch,tr_build_id,tr_prev_build,tr_job_id," +
+      System.out.println("gh_project_name,git_branch,tr_build_id,tr_prev_build," +
           "git_trigger_commit,tr_status,tr_log_num_tests_run,tr_log_num_tests_ok," +
           "tr_log_num_tests_skipped,tr_log_num_tests_failed,tr_log_tests_failed");
       System.out.println();
       System.out.println("The values for \"gh_project\", \"git_branch\", \"tr_build_id\", " +
-          "\"tr_job_id\" and \"git_trigger_commit\" must not be empty. Additionally, " +
-          "\"tr_build_id\", \"tr_prev_build\" and \"tr_job_id\" are required to be valid numbers.");
+          "and \"git_trigger_commit\" must not be empty. Additionally, \"tr_build_id\" " +
+          "and \"tr_prev_build\" are required to be valid numbers.");
       System.out.println();
       System.out.println("Visit https://travistorrent.testroots.org/page_dataformat/ for a more " +
           "detailed description of all the variables needed in the input file.");

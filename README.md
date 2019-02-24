@@ -18,11 +18,11 @@ overridden (given that the method declares `@Test` again or starts with `test`).
 ## Input Data
 It is recommended to use data from [TravisTorrent](https://travistorrent.testroots.org/) as input for this program.
 Running this program requires you to provide a comma-separated CSV file with the following header: 
-`gh_project_name,git_branch,tr_build_id,tr_prev_build,tr_job_id,git_trigger_commit,tr_status,tr_log_num_tests_run,tr_log_num_tests_ok,tr_log_num_tests_skipped,tr_log_num_tests_failed,tr_log_tests_failed`
+`gh_project_name,git_branch,tr_build_id,tr_prev_build,git_trigger_commit,tr_status,tr_log_num_tests_run,tr_log_num_tests_ok,tr_log_num_tests_skipped,tr_log_num_tests_failed,tr_log_tests_failed`
 
 The variables in the header are explained [here](https://travistorrent.testroots.org/page_dataformat/).
-The values for `gh_project`, `git_branch`, `tr_build_id`, `tr_job_id` and `git_trigger_commit` must not be empty.
-Additionally, `tr_build_id`, `tr_prev_build` and `tr_job_id` are required to be valid numbers.<br>
+The values for `gh_project`, `git_branch`, `tr_build_id`, and `git_trigger_commit` must not be empty.
+Additionally, `tr_build_id` and `tr_prev_build` are required to be valid numbers.<br>
 
 ## Output Data
 The results of the analysis are two CSV files:

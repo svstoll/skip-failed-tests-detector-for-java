@@ -180,7 +180,7 @@ public class MethodExtractor {
       }
 
       if (newPotentialParentClasses != null && newPotentialParentClasses.equals(potentialParentClasses)) {
-        LOGGER.debug("Loop detected while searching for potential parent classes for: {}", newPotentialParentClasses);
+        LOGGER.info("Loop detected while searching for potential parent classes for: {}", newPotentialParentClasses);
         potentialParentClasses = null;
       }
       else {

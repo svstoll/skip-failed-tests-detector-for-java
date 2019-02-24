@@ -47,12 +47,14 @@ public class BuildParser {
 
       for (CSVRecord record : csvParser.getRecords()) {
         Build build = transformRecordToBuild(record);
-        builds.add(build);
 
         String project = build.getProjectBranchKey().getProjectName();
         involvedProjects.add(project);
         if (hasExtractionErrors(build)) {
           projectsWithExtractionErrors.add(project);
+        }
+        else {
+          builds.add(build);
         }
       }
     } catch (Exception e) {
@@ -108,7 +110,6 @@ public class BuildParser {
     boolean hasExtractionErrors = false;
     for (String method : build.getFailedMethods()) {
       if (method.isEmpty() || !Character.isLowerCase(method.charAt(0)) || method.contains(" ")) {
-        System.out.println(method);
         hasExtractionErrors = true;
       }
     }

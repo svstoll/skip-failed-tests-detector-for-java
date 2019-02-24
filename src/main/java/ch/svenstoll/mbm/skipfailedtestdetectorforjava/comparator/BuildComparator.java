@@ -66,11 +66,8 @@ public class BuildComparator {
         Build buildT1Copy = buildT1 != null ? new Build(buildT1) : null;
         Build buildT2Copy = new Build(buildT2);
 
-
-        if (buildT1 != null && !CollectionUtility.isNullOrEmpty(buildT1.getFailedMethods())) {
-          extractor.extractMethodsForBuild(buildT1Copy);
-          extractor.extractMethodsForBuild(buildT2Copy);
-        }
+        extractor.extractMethodsForBuild(buildT1Copy);
+        extractor.extractMethodsForBuild(buildT2Copy);
 
         compareConsecutiveBuilds(buildT1Copy, buildT2Copy, allResultsPrinter, smellResultsPrinter);
         lastAnalyzedBuild = buildT2Copy;

@@ -7,6 +7,7 @@ import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParseProblemException;
 import com.github.javaparser.TokenMgrException;
 import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.ImportDeclaration;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.ResetCommand;
 import org.eclipse.jgit.api.Status;
@@ -134,7 +135,8 @@ public class MethodExtractor {
         packageName = compilationUnit.getPackageDeclaration().get().getNameAsString();
       }
 
-      compilationUnit.accept(new MethodVisitor(), new MethodVisitorArgument(packageName, methodsByClass));
+      MethodVisitorArgument arg = new MethodVisitorArgument(packageName, methodsByClass, hasJUnitImports(compilationUnit));
+      compilationUnit.accept(new MethodVisitor(), arg);
     }
     catch (TokenMgrException | ParseProblemException e) {
       // Because there are cases where projects keep invalid Java files for testing purposes (e.g.
@@ -145,6 +147,20 @@ public class MethodExtractor {
     catch (IOException e) {
       throw new RuntimeException("I/O exception while trying to extract methods for \"" + path.toString() + "\".", e);
     }
+  }
+
+  private boolean hasJUnitImports(CompilationUnit cu) {
+    if (cu == null) {
+      return false;
+    }
+
+    List<ImportDeclaration> imports = cu.getImports();
+    for (ImportDeclaration importDeclaration : imports) {
+      if (importDeclaration.getName().asString().contains("junit")) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private void checkForExtendedTestMethods(Map<BasicClassData, List<BasicMethodData>> methodsByClass) {

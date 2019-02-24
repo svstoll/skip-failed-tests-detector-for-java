@@ -10,10 +10,14 @@ public class MethodVisitorArgument {
 
   private final String packageName;
   private final Map<BasicClassData, List<BasicMethodData>> methodsByClass;
+  private final boolean hasJUnitImports;
 
-  public MethodVisitorArgument(String packageName, Map<BasicClassData, List<BasicMethodData>> methodsByClass) {
+  public MethodVisitorArgument(String packageName,
+                               Map<BasicClassData, List<BasicMethodData>> methodsByClass,
+                               boolean hasJUnitImports) {
     this.packageName = packageName;
     this.methodsByClass = methodsByClass;
+    this.hasJUnitImports = hasJUnitImports;
   }
 
   public String getPackageName() {
@@ -22,5 +26,9 @@ public class MethodVisitorArgument {
 
   public Map<BasicClassData, List<BasicMethodData>> getMethodsByClass() {
     return methodsByClass;
+  }
+
+  public boolean hasJUnitImports() {
+    return hasJUnitImports;
   }
 }

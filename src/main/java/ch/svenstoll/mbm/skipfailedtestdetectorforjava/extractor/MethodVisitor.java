@@ -28,7 +28,7 @@ public class MethodVisitor extends VoidVisitorAdapter<MethodVisitorArgument> {
     BasicMethodData methodData = new BasicMethodData(qualifiedMethodName, methodSignature,
         classData);
     methodData.setIsChildMethod(isChildMethod(declaration));
-    methodData.setIsTestMethod(isTestMethod(declaration));
+    methodData.setIsTestMethod(isTestMethod(declaration, arg.hasJUnitImports()));
     methodData.setIsAbstract(declaration.isAbstract());
 
     final Map<BasicClassData, List<BasicMethodData>> methodsByClass = arg.getMethodsByClass();
@@ -56,13 +56,17 @@ public class MethodVisitor extends VoidVisitorAdapter<MethodVisitorArgument> {
     return declaration.getAnnotationByName("Override").isPresent();
   }
 
-  private boolean isTestMethod(MethodDeclaration declaration) {
-    if (declaration.getAnnotationByName("Ignore").isPresent()) {
+  private boolean isTestMethod(MethodDeclaration method, boolean hasJUnitImports) {
+    if (method.getAnnotationByName("Ignore").isPresent()) {
       return false;
     }
 
-    return declaration.getAnnotationByName("Test").isPresent()
-        || declaration.getNameAsString().toLowerCase().startsWith("test");
+    boolean isJUnit3TestMethod = (hasJUnitImports && method.getNameAsString().toLowerCase().startsWith("test"));
+    boolean isJUnit4TestMethod = method.getAnnotationByName("Test").isPresent();
+    boolean isJUnit5TestMethod = method.getAnnotationByName("ParameterizedTest").isPresent()
+        || method.getAnnotationByName("RepeatedTest").isPresent();
+
+    return isJUnit3TestMethod || isJUnit4TestMethod || isJUnit5TestMethod;
   }
 
   private BasicClassData calculateBasicClassData(String packageName, Node node) {

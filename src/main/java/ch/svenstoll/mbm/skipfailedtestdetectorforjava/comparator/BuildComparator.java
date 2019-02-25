@@ -47,11 +47,11 @@ public class BuildComparator {
          FileWriter smellResultsOut = new FileWriter(smellResultsFilePath, true);
          CSVPrinter allResultsPrinter = new CSVPrinter(allResultsOut, allResultsCsvFormat);
          CSVPrinter smellResultsPrinter = new CSVPrinter(smellResultsOut, smellResultsCsvFormat)) {
-      List<Build> reducedBuilds = prepareBuildComparison(builds);
-      Map<Long, Build> buildsByBuildId = generateBuildByBuildIdMap(reducedBuilds);
+      prepareBuildComparison(builds);
+      Map<Long, Build> buildsByBuildId = generateBuildByBuildIdMap(builds);
 
       Build lastAnalyzedBuild = null; // Used as a simple cache to prevent unnecessary extractions.
-      for (Build buildT2 : reducedBuilds) {
+      for (Build buildT2 : builds) {
         Build buildT1 = null;
         if (lastAnalyzedBuild != null && buildT2.getPrevBuildId() != null) {
           buildT1 = lastAnalyzedBuild.getBuildId() == buildT2.getPrevBuildId() ? lastAnalyzedBuild : null;
@@ -94,7 +94,7 @@ public class BuildComparator {
     return csvFormat;
   }
 
-  private List<Build> prepareBuildComparison(List<Build> builds) {
+  private void prepareBuildComparison(List<Build> builds) {
     // Sort by project, branch, build ID and job ID
     builds.sort((build1, build2) -> {
       String projectBranch1 = build1.getProjectBranchKey().toString();
@@ -108,18 +108,6 @@ public class BuildComparator {
       long buildId2 = build2.getBuildId();
       return Long.compare(buildId1, buildId2);
     });
-
-    // If there are multiple jobs per build, only the first one will be included in the analysis.
-    Long lastBuildId = null;
-    List<Build> reducedBuilds = new ArrayList<>();
-    for (Build build : builds) {
-      if (lastBuildId == null || !lastBuildId.equals(build.getBuildId())) {
-        reducedBuilds.add(build);
-      }
-      lastBuildId = build.getBuildId();
-    }
-
-    return reducedBuilds;
   }
 
   private Map<Long, Build> generateBuildByBuildIdMap(List<Build> builds) {
@@ -207,7 +195,7 @@ public class BuildComparator {
         .andDeltaTestsOk(deltaNumTestsOk)
         .andDeltaTestsFailed(deltaNumTestsFailed)
         .andDeltaTestsSkipped(deltaNumTestsSkipped)
-        .andLegacySmellWarning(calculateLegacySmellWarning(deltaNumTestsRun, deltaNumTestsFailed, deltaNumTestsSkipped))
+        .andLegacySmellWarning(calculateLegacySmellWarning(buildT1.getStatus(), deltaNumTestsRun, deltaNumTestsFailed, deltaNumTestsSkipped))
         .andNumFailedMethodsNotExtracted(calculateNumFailedMethodsNotExtracted(buildT1.getFailedMethods(), testMethodsT1))
         .andNumRemovedFailedTests(removedFailedMethods.size())
         .andRemovedFailedTests(StringUtility.concatStrings(removedFailedMethods, "#"))
@@ -264,11 +252,14 @@ public class BuildComparator {
     return NumberUtility.calculateDelta(buildT2.getNumTestsSkipped(), buildT1.getNumTestsSkipped());
   }
 
-  private Boolean calculateLegacySmellWarning(Integer deltaNumTestsRun, Integer deltaNumTestsFailed, Integer deltaNumTestsSkipped) {
-    if (deltaNumTestsRun == null || deltaNumTestsFailed == null || deltaNumTestsSkipped == null) {
+  private Boolean calculateLegacySmellWarning(String buildT1Status, Integer deltaNumTestsRun, Integer deltaNumTestsFailed, Integer deltaNumTestsSkipped) {
+    if (buildT1Status == null || deltaNumTestsRun == null || deltaNumTestsFailed == null || deltaNumTestsSkipped == null) {
       return null;
     }
-    return deltaNumTestsFailed < 0 && (deltaNumTestsRun < 0 || deltaNumTestsSkipped > 0);
+    boolean buildT1Passed = buildT1Status.equalsIgnoreCase("passed");
+    boolean skippedTestMethods = deltaNumTestsFailed < 0 && (deltaNumTestsRun < 0 || deltaNumTestsSkipped > 0);
+
+    return !buildT1Passed && skippedTestMethods;
   }
 
   private int calculateNumFailedMethodsNotExtracted(List<String> failedMethods, Set<BasicMethodData> testMethods) {

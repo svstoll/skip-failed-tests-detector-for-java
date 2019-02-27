@@ -70,8 +70,14 @@ public class BuildParser {
           "projects will be excluded.", projectsWithExtractionErrors.size(), numRemovedBuilds);
     }
 
-    LOGGER.info("Parsed {} builds from {} projects.", validBuilds.size(),
-        involvedProjects.size() - projectsWithExtractionErrors.size());
+    long numOfBuildsWithFailedTests = validBuilds.stream()
+        .filter(build -> build.getNumTestsFailed() != null && build.getNumTestsFailed() > 0)
+        .count();
+    LOGGER.info("Parsed {} builds from {} projects. {} of these builds have at least 1 failed test.",
+        validBuilds.size(),
+        involvedProjects.size() - projectsWithExtractionErrors.size(),
+        numOfBuildsWithFailedTests);
+
     return validBuilds;
   }
 
